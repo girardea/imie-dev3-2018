@@ -121,8 +121,7 @@ def geoloc(df, columns, postcode, verbose=False):
     
     # Test d'erreur serveur
     if r.text.startswith('<html>'):
-        print(r.text)
-        return
+        raise Exception("Geoloc failed.")
     
     df_res = pd.read_csv(StringIO(r.text))
     
@@ -206,6 +205,7 @@ def update(date):
     # lat/lon
     df_geo = geoloc(dft, columns=['ADRESSE', 'COM', 'CODPOS', 'LIBCOM'],
                     postcode='CODPOS')
+    dft = dft.reset_index(drop=True)
     dft['latitude'] = df_geo['latitude']
     dft['longitude'] = df_geo['longitude']
 
