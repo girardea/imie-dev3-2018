@@ -13,7 +13,7 @@ import os
 import urllib
 
 # Pour lire et écrire dans des BDD
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, func, MetaData, select, Table
 
 # Pour zipper/dézipper
 import zipfile
@@ -85,7 +85,8 @@ def check_date(date):
         stmt = stmt.where(rests.c.CREATEDDATE == date)
         
         num = connection.execute(stmt).scalar()
-    except:
+
+    except Exception as e:
         # cas où la table restaurants n'existe pas encore
         num = 0
 
