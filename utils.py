@@ -4,16 +4,22 @@ import datetime as dt
 # Pour faire des recherches de fichiers dans des répertoires (type 'ls')
 import glob
 
+from io import StringIO
+
 import pandas as pd
 
 # Pour accéder à la fonction remove, qui supprime des fichiers
 import os
 
-# Pour télécharger des fichiers
-import urllib
+import requests
 
 # Pour lire et écrire dans des BDD
 from sqlalchemy import create_engine, func, MetaData, select, Table
+
+import time
+
+# Pour télécharger des fichiers
+import urllib
 
 # Pour zipper/dézipper
 import zipfile
@@ -95,6 +101,40 @@ def check_date(date):
     
     return (num > 0)
 
+def geoloc(df, columns, postcode, verbose=False):
+    """Géo-localise les adresses présentes dans les colonnes d'un df"""
+    # Ecrire les données dans un csv
+    file = StringIO()
+    df[columns].to_csv(file, index=False)
+    
+    # Revenir au début du fichier
+    file.seek(0)
+    
+    if verbose:
+        t = time.time()
+    
+    # Envoyer les adresses à l'API adresse.data.gouv.fr
+    r = requests.post("https://api-adresse.data.gouv.fr/search/csv/",
+                      timeout=600,
+                      files={'data': file},
+                      params={'postcode': postcode})
+    
+    # Test d'erreur serveur
+    if r.text.startswith('<html>'):
+        print(r.text)
+        return
+    
+    df_res = pd.read_csv(StringIO(r.text))
+    
+    if verbose:
+        print("Requête effectuée en {temps}".format(
+            temps=time.time() - t))
+        print("{x}% d'adresses géo-localisées.".format(
+            x=100 * (1 - df_res['latitude'].isnull().mean())))
+    
+    # Lire les données dans un DataFrame
+    return df_res
+
 def update(date):
     """Mise à jour quotidienne à partir du fichier SIRENE"""
     # test si la date est déjà en base
@@ -162,6 +202,12 @@ def update(date):
 
     # CREATEDDATE
     dft['CREATEDDATE'] = date
+
+    # lat/lon
+    df_geo = geoloc(dft, columns=['ADRESSE', 'COM', 'CODPOS', 'LIBCOM'],
+                    postcode='CODPOS')
+    dft['latitude'] = df_geo['latitude']
+    dft['longitude'] = df_geo['longitude']
 
     """
     Export de la table restaurants
